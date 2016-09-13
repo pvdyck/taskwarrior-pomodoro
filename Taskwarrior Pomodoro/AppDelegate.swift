@@ -653,6 +653,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSUserNotifi
 
         taskCommand([activeTaskId!, "stop"])
         
+        runStopCompletionHooks(activeTaskId!)
+        
         activeTaskId = nil
         updateMenuItems()
     }
@@ -668,6 +670,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSUserNotifi
         }
         
         updateMenuItems()
+        runPreStartHooks(taskId)
     }
     
     func runPostCompletionHooks(taskId: String) {
@@ -688,6 +691,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSUserNotifi
                 let alert:NSAlert = NSAlert();
                 alert.messageText = "Post-Hook Error";
                 alert.informativeText = "An error was encountered when running your post-hook command: `\(stderr)`.";
+                alert.runModal();
+            }
+        }
+    }
+    
+    func runStopCompletionHooks(taskId: String) {
+        if let stopCompletionCommand = configuration!["pomodoro.stopCompletionCommand"] {
+            let errorPipe = NSPipe()
+            let errorFile = errorPipe.fileHandleForReading
+            
+            let task = NSTask()
+            task.launchPath = "/bin/sh"
+            task.arguments = ["-c", "\(stopCompletionCommand) \(taskId)"]
+            task.standardError = errorPipe
+            task.launch()
+            task.waitUntilExit()
+            
+            let stderr = stringFromFileAndClose(errorFile)
+            
+            if task.terminationStatus != 0 {
+                let alert:NSAlert = NSAlert();
+                alert.messageText = "Stop-Hook Error";
+                alert.informativeText = "An error was encountered when running your stop-hook command: `\(stderr)`.";
+                alert.runModal();
+            }
+        }
+    }
+    
+    func runPreStartHooks(taskId: String) {
+        if let preStartCommand = configuration!["pomodoro.preCompletionCommand"] {
+            let errorPipe = NSPipe()
+            let errorFile = errorPipe.fileHandleForReading
+            
+            let task = NSTask()
+            task.launchPath = "/bin/sh"
+            task.arguments = ["-c", "\(preStartCommand) \(taskId)"]
+            task.standardError = errorPipe
+            task.launch()
+            task.waitUntilExit()
+            
+            let stderr = stringFromFileAndClose(errorFile)
+            
+            if task.terminationStatus != 0 {
+                let alert:NSAlert = NSAlert();
+                alert.messageText = "Pre-Hook Error";
+                alert.informativeText = "An error was encountered when running your pre-hook command: `\(stderr)`.";
                 alert.runModal();
             }
         }
